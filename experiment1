@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clearbit Identify Widget</title>
+
+<style>
+  #cb-widget {
+    display: none;
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    width: 320px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 14px;
+    z-index: 9999;
+  }
+
+  #cb-card {
+    background: #fff;
+    border: 1px solid #e5e5e5;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+    position: relative;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    #cb-card  { background: #1c1c1e; border-color: #333; color: #f0f0f0; }
+    #cb-input { background: #2c2c2e; border-color: #444; color: #f0f0f0; }
+    #cb-dismiss { color: #888; }
+  }
+
+  #cb-close {
+    position: absolute;
+    top: 12px; right: 14px;
+    background: none; border: none;
+    font-size: 18px; cursor: pointer;
+    color: #999; line-height: 1;
+  }
+
+  #cb-company-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 20px;
+    font-size: 12px;
+    color: #15803d;
+    margin-bottom: 12px;
+  }
+
+  #cb-company-chip .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #22c55e;
+    flex-shrink: 0;
+  }
+
+  #cb-headline {
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.4;
+    margin: 0 0 6px;
+    color: inherit;
+  }
+
+  #cb-sub {
+    font-size: 13px;
+    color: #666;
+    margin: 0 0 14px;
+    line-height: 1.5;
+  }
+
+  #cb-input {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 13px;
+    box-sizing: border-box;
+    margin-bottom: 8px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  #cb-input:focus { border-color: #7c3aed; }
+  #cb-input.error { border-color: #ef4444; }
+
+  #cb-btn {
+    width: 100%;
+    padding: 10px;
+    background: #7c3aed;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  #cb-btn:hover { background: #6d28d9; }
+
+  #cb-dismiss {
+    display: block;
+    text-align: center;
+    margin-top: 8px;
+    font-size: 11px;
+    color: #999;
+    cursor: pointer;
+    background: none;
+    border: none;
+    width: 100%;
+  }
+
+  #cb-success {
+    display: none;
+    text-align: center;
+    padding: 8px 0 4px;
+  }
+
+  #cb-success p {
+    margin: 8px 0 0;
+    font-size: 13px;
+    color: #666;
+    line-height: 1.5;
+  }
+
+  #cb-debug {
+    margin-top: 10px;
+    padding: 8px 10px;
+    background: #f8f8f8;
+    border: 1px solid #eee;
+    border-radius: 6px;
+    font-size: 11px;
+    color: #555;
+    font-family: monospace;
+    line-height: 1.6;
+    display: none;
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  #cb-widget.visible {
+    display: block;
+    animation: slideUp 0.3s ease;
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Widget markup ── -->
+<div id="cb-widget">
+  <div id="cb-card">
+
+    <button id="cb-close" onclick="cbDismiss()" aria-label="Close">×</button>
+
+    <!-- State 1: input -->
+    <div id="cb-state-input">
+      <div id="cb-company-chip">
+        <span class="dot"></span>
+        <span id="cb-company-name">your company</span>
+      </div>
+
+      <p id="cb-headline">Looks like you're visiting from <span id="cb-company-inline"></span></p>
+      <p id="cb-sub">Get a personalized walkthrough built for your team.</p>
+
+      <input
+        id="cb-input"
+        type="email"
+        placeholder="you@company.com"
+        autocomplete="email"
+      />
+
+      <button id="cb-btn" onclick="cbSubmit()">Show me my personalized view</button>
+      <button id="cb-dismiss" onclick="cbDismiss()">Not from here? Skip this</button>
+
+      <!-- Debug panel — visible only when DEBUG = true -->
+      <div id="cb-debug"></div>
+    </div>
+
+    <!-- State 2: success -->
+    <div id="cb-success">
+      <svg width="36" height="36" viewBox="0 0 36 36" fill="none" style="margin:0 auto;display:block">
+        <circle cx="18" cy="18" r="17" stroke="#22c55e" stroke-width="1.5"/>
+        <path d="M11 18l5 5 9-9" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <p id="cb-success-msg">Got it! We'll personalize your experience.</p>
+    </div>
+
+  </div>
+</div>
+
+
+<script>
+(function () {
+
+  /* ══════════════════════════════════════════
+     CONFIG — edit these
+  ══════════════════════════════════════════ */
+  var PK              = 'pk_dc2b252f44191f238fe323fd57bc26b1';
+  var DEBUG           = true;    // set false in production — hides debug panel + console logs
+  var DELAY_MS        = 5000;    // ms after page load before widget appears
+  var DISMISS_DAYS    = 14;      // days to suppress after user dismisses
+  var SUCCESS_HIDE_MS = 3000;    // ms before widget auto-hides after submit
+
+  /* Optional: your Marketo webhook URL — uncomment to enable */
+  // var MARKETO_WEBHOOK = 'https://your-marketo-webhook-url';
+
+  /* ══════════════════════════════════════════
+     DEBUG LOGGER
+  ══════════════════════════════════════════ */
+  var dbgEl = document.getElementById('cb-debug');
+
+  function log(msg, data) {
+    if (!DEBUG) return;
+    var line = '[cb] ' + msg + (data !== undefined ? ': ' + JSON.stringify(data, null, 2) : '');
+    console.log(line);
+    if (dbgEl) {
+      dbgEl.style.display = 'block';
+      dbgEl.innerHTML += line + '<br>';
+    }
+  }
+
+  /* ══════════════════════════════════════════
+     HELPERS
+  ══════════════════════════════════════════ */
+  function setCookie(name, val, days) {
+    var d = new Date();
+    d.setTime(d.getTime() + days * 864e5);
+    document.cookie = name + '=' + val + ';expires=' + d.toUTCString() + ';path=/';
+  }
+
+  function getCookie(name) {
+    var m = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+    return m ? m[2] : null;
+  }
+
+  function validEmail(e) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+  }
+
+  /* ══════════════════════════════════════════
+     UI
+  ══════════════════════════════════════════ */
+  function setCompanyName(name) {
+    document.getElementById('cb-company-name').textContent   = name;
+    document.getElementById('cb-company-inline').textContent = name;
+  }
+
+  function showWidget() {
+    log('showing widget');
+    document.getElementById('cb-widget').classList.add('visible');
+  }
+
+  function cbDismiss() {
+    log('dismissed');
+    document.getElementById('cb-widget').style.display = 'none';
+    setCookie('cb_dismissed', '1', DISMISS_DAYS);
+  }
+  window.cbDismiss = cbDismiss;
+
+  function cbSubmit() {
+    var input = document.getElementById('cb-input');
+    var email = input.value.trim();
+
+    if (!validEmail(email)) {
+      input.classList.add('error');
+      input.placeholder = 'Please enter a valid work email';
+      log('invalid email entered');
+      return;
+    }
+    input.classList.remove('error');
+    log('identify firing', { email: email });
+
+    /* ── CLEARBIT IDENTIFY ── */
+    if (window.clearbit && typeof clearbit.identify === 'function') {
+      clearbit.identify(email, { email: email });
+      log('clearbit.identify() called OK');
+    } else {
+      log('clearbit.identify not available — tag may not be loaded yet');
+    }
+
+    /* ── Optional Marketo webhook ── */
+    /*
+    if (typeof MARKETO_WEBHOOK !== 'undefined') {
+      fetch(MARKETO_WEBHOOK, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email })
+      }).then(function() {
+        log('marketo webhook fired OK');
+      }).catch(function(err) {
+        log('marketo webhook error', err.message);
+      });
+    }
+    */
+
+    /* ── Show success ── */
+    document.getElementById('cb-state-input').style.display = 'none';
+    document.getElementById('cb-success').style.display     = 'block';
+    setCookie('cb_identified', email, 365);
+
+    setTimeout(function () {
+      document.getElementById('cb-widget').style.display = 'none';
+    }, SUCCESS_HIDE_MS);
+  }
+  window.cbSubmit = cbSubmit;
+
+  /* Enter key submits */
+  document.getElementById('cb-input').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') cbSubmit();
+  });
+
+  /* ══════════════════════════════════════════
+     CORE INIT — runs after Clearbit tag loads
+  ══════════════════════════════════════════ */
+  function init() {
+    log('clearbit tag loaded, starting init');
+
+    /* Don't show if already identified or dismissed */
+    if (getCookie('cb_identified')) { log('already identified — skipping'); return; }
+    if (getCookie('cb_dismissed'))  { log('dismissed recently — skipping'); return; }
+
+    var fallbackTimer = setTimeout(function () {
+      log('cb:ready never fired — showing generic widget');
+      setCompanyName('your company');
+      document.getElementById('cb-headline').textContent = 'Want a personalized walkthrough?';
+      showWidget();
+    }, DELAY_MS + 5000);
+
+    /* Listen for Clearbit Reveal result */
+    window.addEventListener('cb:ready', function () {
+      clearTimeout(fallbackTimer);
+
+      var company = (window.CB && CB.analytics && CB.analytics.company)
+                  ? CB.analytics.company : null;
+      var person  = (window.CB && CB.analytics && CB.analytics.person)
+                  ? CB.analytics.person  : null;
+
+      log('cb:ready fired — company', company);
+      log('cb:ready fired — person',  person);
+
+      if (company && company.name) {
+        setCompanyName(company.name);
+
+        /* Personalise sub-copy if we have industry data */
+        if (company.category && company.category.industry) {
+          document.getElementById('cb-sub').textContent =
+            'We\'ve helped ' + company.category.industry +
+            ' teams like yours grow faster. Want a view built for ' +
+            company.name + '?';
+        }
+
+        /* Pre-fill email domain if person not yet known */
+        if (!person && company.domain) {
+          document.getElementById('cb-input').placeholder =
+            'you@' + company.domain;
+        }
+
+        /* Pre-fill full email if person is already identified */
+        if (person && person.email) {
+          document.getElementById('cb-input').value = person.email;
+          log('person already known — pre-filled email', person.email);
+        }
+
+      } else {
+        log('no company match — showing generic widget');
+        setCompanyName('your company');
+        document.getElementById('cb-headline').textContent =
+          'Want a personalized walkthrough?';
+      }
+
+      setTimeout(showWidget, DELAY_MS);
+    });
+  }
+
+  /* ══════════════════════════════════════════
+     LOAD CLEARBIT TAG DYNAMICALLY
+     Removes existing tag (reveal=false) first,
+     then emits fresh one with reveal=true
+  ══════════════════════════════════════════ */
+  function loadClearbit(onReady) {
+    var existing = document.querySelector('script[src*="clearbitjs"]');
+    if (existing) {
+      log('removing existing clearbit tag (reveal=false)');
+      existing.remove();
+    }
+
+    var s   = document.createElement('script');
+    s.src   = 'https://x.clearbitjs.com/v1/' + PK + '/tags.js'
+            + '?reveal=true&reveal_async=true&tracking=true&tracking_cookies=true';
+    s.onload = function () {
+      log('new clearbit tag emitted and loaded with reveal=true');
+      onReady();
+    };
+    s.onerror = function () {
+      log('ERROR: clearbit tag failed to load — check your PK or network');
+    };
+    document.head.appendChild(s);
+    log('emitting clearbit tag', s.src);
+  }
+
+  /* ══════════════════════════════════════════
+     ENTRY POINT
+  ══════════════════════════════════════════ */
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () {
+      loadClearbit(init);
+    });
+  } else {
+    loadClearbit(init);
+  }
+
+})();
+</script>
+
+</body>
+</html>
