@@ -1,11 +1,20 @@
 <!DOCTYPE html>
 <html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#000000">
+  <title>Beacon Scanner</title>
+</head>
 <body style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; margin:0; font-family:sans-serif;">
   <button id="btn" onclick="go()" style="font-size:22px; padding:20px 50px; border-radius:12px; cursor:pointer;">
-    🔵 Detect Beacon
+    🔵 Scan Beacon
   </button>
   <p id="msg" style="margin-top:20px; font-size:16px; color:#555; text-align:center; white-space:pre;"></p>
   <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js');
+    }
     async function connect(device, tries = 5) {
       for (let i = 0; i < tries; i++) {
         try { return await device.gatt.connect(); }
