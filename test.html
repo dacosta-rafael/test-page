@@ -1,47 +1,34 @@
 <!DOCTYPE html>
 <html>
-<body>
-  <button id="btn" onclick="manual()" style="display:none">Pair beacon</button>
-  <p id="status">Checking for beacon...</p>
+<body style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; margin:0; font-family:sans-serif;">
+  <button id="btn" onclick="go()" style="font-size:22px; padding:20px 50px; border-radius:12px; cursor:pointer;">
+    🔵 Check Beacon
+  </button>
+  <p id="msg" style="margin-top:20px; font-size:16px; color:#555;"></p>
+
   <script>
-    const status = document.getElementById("status");
-    const btn = document.getElementById("btn");
-
-    async function connect(device) {
-      status.textContent = "Connecting...";
-      const server = await device.gatt.connect();
-      const svc = await server.getPrimaryService("battery_service");
-      const chr = await svc.getCharacteristic("battery_level");
-      const val = await chr.readValue();
-      alert("Battery: " + val.getUint8(0) + "%");
-      status.textContent = "Done!";
-    }
-
-    // Runs automatically on load
-    async function autoConnect() {
+    async function go() {
+      const btn = document.getElementById("btn");
+      const msg = document.getElementById("msg");
+      btn.disabled = true;
+      msg.textContent = "Searching...";
       try {
-        const devices = await navigator.bluetooth.getDevices();
-        const device = devices.find(d => d.name === "BCPro_208061");
-        if (device) {
-          await connect(device);
-        } else {
-          status.textContent = "Never paired - click button to pair";
-          btn.style.display = "block";
-        }
+        const device = await navigator.bluetooth.requestDevice({
+          filters: [{ name: "BCPro_208061" }],
+          optionalServices: ["battery_service"]
+        });
+        msg.textContent = "Connecting...";
+        const server = await device.gatt.connect();
+        const svc = await server.getPrimaryService("battery_service");
+        const chr = await svc.getCharacteristic("battery_level");
+        const val = await chr.readValue();
+        const pct = val.getUint8(0);
+        msg.textContent = "🔋 Battery: " + pct + "%";
       } catch(e) {
-        status.textContent = "Error: " + e.message;
+        msg.textContent = e.message.includes("cancelled") ? "Cancelled" : "Error: " + e.message;
       }
+      btn.disabled = false;
     }
-
-    async function manual() {
-      const device = await navigator.bluetooth.requestDevice({
-        filters: [{ name: "BCPro_208061" }],
-        optionalServices: ["battery_service"]
-      });
-      await connect(device);
-    }
-
-    autoConnect();
   </script>
 </body>
 </html>
