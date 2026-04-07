@@ -1,37 +1,47 @@
 <!DOCTYPE html>
 <html>
 <body>
-  <button onclick="scan()">Read beacon data</button>
+  <button id="btn" onclick="manual()" style="display:none">Pair beacon</button>
+  <p id="status">Checking for beacon...</p>
   <script>
-    async function scan() {
+    const status = document.getElementById("status");
+    const btn = document.getElementById("btn");
+
+    async function connect(device) {
+      status.textContent = "Connecting...";
+      const server = await device.gatt.connect();
+      const svc = await server.getPrimaryService("battery_service");
+      const chr = await svc.getCharacteristic("battery_level");
+      const val = await chr.readValue();
+      alert("Battery: " + val.getUint8(0) + "%");
+      status.textContent = "Done!";
+    }
+
+    // Runs automatically on load
+    async function autoConnect() {
+      try {
+        const devices = await navigator.bluetooth.getDevices();
+        const device = devices.find(d => d.name === "BCPro_208061");
+        if (device) {
+          await connect(device);
+        } else {
+          status.textContent = "Never paired - click button to pair";
+          btn.style.display = "block";
+        }
+      } catch(e) {
+        status.textContent = "Error: " + e.message;
+      }
+    }
+
+    async function manual() {
       const device = await navigator.bluetooth.requestDevice({
         filters: [{ name: "BCPro_208061" }],
-        optionalServices: ["battery_service", "device_information"]
+        optionalServices: ["battery_service"]
       });
-
-      const server = await device.gatt.connect();
-      let out = "Name: " + device.name + "\nID: " + device.id + "\n\n";
-
-      try {
-        const svc = await server.getPrimaryService("battery_service");
-        const chr = await svc.getCharacteristic("battery_level");
-        const val = await chr.readValue();
-        out += "Battery: " + val.getUint8(0) + "%\n";
-      } catch(e) { out += "Battery: n/a\n"; }
-
-      try {
-        const svc = await server.getPrimaryService("device_information");
-        const chars = await svc.getCharacteristics();
-        for (const c of chars) {
-          try {
-            const v = await c.readValue();
-            out += new TextDecoder().decode(v) + "\n";
-          } catch(e) {}
-        }
-      } catch(e) { out += "Device info: n/a\n"; }
-
-      alert(out);
+      await connect(device);
     }
+
+    autoConnect();
   </script>
 </body>
 </html>
