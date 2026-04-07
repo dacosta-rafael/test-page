@@ -1,13 +1,39 @@
 <!DOCTYPE html>
 <html>
 <body>
-  <button onclick="scan()">Find beacon</button>
+  <button onclick="scan()">Read beacon data</button>
+  <pre id="out"></pre>
   <script>
     async function scan() {
       const device = await navigator.bluetooth.requestDevice({
-        acceptAllDevices: true
+        filters: [{ name: "BCPro_208061" }],
+        optionalServices: ["battery_service", "device_information"]
       });
-      alert("Name: " + device.name + "\nID: " + device.id);
+
+      const server = await device.gatt.connect();
+      let out = "Name: " + device.name + "\nID: " + device.id + "\n\n";
+
+      // Battery level
+      try {
+        const svc = await server.getPrimaryService("battery_service");
+        const chr = await svc.getCharacteristic("battery_level");
+        const val = await chr.readValue();
+        out += "Battery: " + val.getUint8(0) + "%\n";
+      } catch(e) { out += "Battery: not available\n"; }
+
+      // Device info
+      try {
+        const svc = await server.getPrimaryService("device_information");
+        const chars = await svc.getCharacteristics();
+        for (const c of chars) {
+          try {
+            const v = await c.readValue();
+            out += c.uuid + ": " + new TextDecoder().decode(v) + "\n";
+          } catch(e) {}
+        }
+      } catch(e) { out += "Device info: not available\n"; }
+
+      document.getElementById("out").textContent = out;
     }
   </script>
 </body>
