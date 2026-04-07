@@ -7,7 +7,7 @@
       const device = await navigator.bluetooth.requestDevice({
         acceptAllDevices: true
       });
-      alert(device.id);
+      alert("Name: " + device.name + "\nID: " + device.id);
     }
   </script>
 </body>
