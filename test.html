@@ -3,7 +3,6 @@
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#000000">
   <title>Beacon Scanner</title>
 </head>
 <body style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; margin:0; font-family:sans-serif;">
@@ -13,13 +12,7 @@
   <p id="msg" style="margin-top:20px; font-size:16px; color:#555; text-align:center; white-space:pre;"></p>
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js');
-    }
-    async function connect(device, tries = 5) {
-      for (let i = 0; i < tries; i++) {
-        try { return await device.gatt.connect(); }
-        catch(e) { if (i === tries-1) throw e; await new Promise(r => setTimeout(r, 500)); }
-      }
+      navigator.serviceWorker.register('/test-page/sw.js');
     }
     async function go() {
       const btn = document.getElementById("btn");
@@ -28,13 +21,9 @@
       msg.textContent = "Looking...";
       try {
         const device = await navigator.bluetooth.requestDevice({
-          filters: [{ name: "Rafael da Costa" }],
-          optionalServices: [0x180A, 0x1800]
+          acceptAllDevices: true
         });
-        msg.textContent = "Found! Connecting...";
-        await connect(device);
-        msg.textContent = "✅ Beacon detected!\nName: " + device.name;
-        device.gatt.disconnect();
+        msg.textContent = "✅ Found!\nName: " + device.name + "\nID: " + device.id;
       } catch(e) {
         msg.textContent = "Error: " + e.message;
       }
