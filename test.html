@@ -5,7 +5,6 @@
     🔵 Read Beacon
   </button>
   <p id="msg" style="margin-top:20px; font-size:16px; color:#555; text-align:center; white-space:pre;"></p>
-
   <script>
     async function connect(device, tries = 5) {
       for (let i = 0; i < tries; i++) {
@@ -13,20 +12,19 @@
         catch(e) { if (i === tries-1) throw e; await new Promise(r => setTimeout(r, 500)); }
       }
     }
-
     async function go() {
       const btn = document.getElementById("btn");
       const msg = document.getElementById("msg");
       btn.disabled = true;
       msg.textContent = "Connecting...";
       try {
-const device = await navigator.bluetooth.requestDevice({
-  acceptAllDevices: true,
-  optionalServices: [0x180A, 0x1801, 0x1800]
-});
+        const device = await navigator.bluetooth.requestDevice({
+          acceptAllDevices: true,
+          optionalServices: [0x180A, 0x1801, 0x1800]
+        });
+        msg.textContent = "Picked: " + device.name + "\nConnecting to GATT...";
         const server = await connect(device);
         let out = "Name: " + device.name + "\n\n";
-
         for (const uuid of ["0000180a-0000-1000-8000-00805f9b34fb",
                              "00001800-0000-1000-8000-00805f9b34fb"]) {
           try {
