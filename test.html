@@ -2,30 +2,30 @@
 <html>
 <body style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; margin:0; font-family:sans-serif;">
   <button id="btn" onclick="go()" style="font-size:22px; padding:20px 50px; border-radius:12px; cursor:pointer;">
-    🔵 Check Beacon
+    🔵 Scan Services
   </button>
-  <p id="msg" style="margin-top:20px; font-size:16px; color:#555;"></p>
+  <p id="msg" style="margin-top:20px; font-size:16px; color:#555; text-align:center; white-space:pre;"></p>
 
   <script>
     async function go() {
       const btn = document.getElementById("btn");
       const msg = document.getElementById("msg");
       btn.disabled = true;
-      msg.textContent = "Searching...";
+      msg.textContent = "Connecting...";
       try {
         const device = await navigator.bluetooth.requestDevice({
           filters: [{ name: "BCPro_208061" }],
-          optionalServices: ["battery_service"]
+          optionalServices: [0x180F, 0x180A, 0x1800, 0x1801, 0x181A, 0xFF00, 0xFFF0]
         });
-        msg.textContent = "Connecting...";
         const server = await device.gatt.connect();
-        const svc = await server.getPrimaryService("battery_service");
-        const chr = await svc.getCharacteristic("battery_level");
-        const val = await chr.readValue();
-        const pct = val.getUint8(0);
-        msg.textContent = "🔋 Battery: " + pct + "%";
+        const services = await server.getPrimaryServices();
+        let out = "Services found:\n";
+        for (const s of services) {
+          out += "• " + s.uuid + "\n";
+        }
+        msg.textContent = out;
       } catch(e) {
-        msg.textContent = e.message.includes("cancelled") ? "Cancelled" : "Error: " + e.message;
+        msg.textContent = "Error: " + e.message;
       }
       btn.disabled = false;
     }
