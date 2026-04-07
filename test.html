@@ -20,10 +20,10 @@
       btn.disabled = true;
       msg.textContent = "Connecting...";
       try {
-        const device = await navigator.bluetooth.requestDevice({
-filters: [{ name: "Rafael da Costa" }],
-          optionalServices: [0x180A, 0x1801, 0x1800]
-        });
+const device = await navigator.bluetooth.requestDevice({
+  acceptAllDevices: true,
+  optionalServices: [0x180A, 0x1801, 0x1800]
+});
         const server = await connect(device);
         let out = "Name: " + device.name + "\n\n";
 
