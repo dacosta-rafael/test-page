@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<body>
+  <button onclick="scan()">Find beacon</button>
+  <script>
+    async function scan() {
+      const device = await navigator.bluetooth.requestDevice({
+        acceptAllDevices: true
+      });
+      alert(device.id);
+    }
+  </script>
+</body>
+</html>
