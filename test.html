@@ -7,6 +7,17 @@
   <p id="msg" style="margin-top:20px; font-size:16px; color:#555; text-align:center; white-space:pre;"></p>
 
   <script>
+    async function connect(device, tries = 5) {
+      for (let i = 0; i < tries; i++) {
+        try {
+          return await device.gatt.connect();
+        } catch(e) {
+          if (i === tries - 1) throw e;
+          await new Promise(r => setTimeout(r, 500));
+        }
+      }
+    }
+
     async function go() {
       const btn = document.getElementById("btn");
       const msg = document.getElementById("msg");
@@ -15,9 +26,10 @@
       try {
         const device = await navigator.bluetooth.requestDevice({
           filters: [{ name: "BCPro_208061" }],
-          optionalServices: [0x180F, 0x180A, 0x1800, 0x1801, 0x181A, 0xFF00, 0xFFF0]
+          optionalServices: [0x180F, 0x180A, 0x1800, 0x1801, 0xFF00, 0xFFF0]
         });
-        const server = await device.gatt.connect();
+        const server = await connect(device);
+        msg.textContent = "Connected! Reading...";
         const services = await server.getPrimaryServices();
         let out = "Services found:\n";
         for (const s of services) {
