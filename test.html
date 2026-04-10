@@ -1,34 +1,232 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="manifest" href="manifest.json">
-  <title>Beacon Scanner</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NFC Writer Test</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #111827;
+      color: #f9fafb;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 520px;
+      background: #1f2937;
+      border: 1px solid #374151;
+      border-radius: 16px;
+      padding: 24px;
+    }
+
+    h1 {
+      margin-top: 0;
+      font-size: 24px;
+    }
+
+    p {
+      color: #d1d5db;
+      line-height: 1.5;
+    }
+
+    label {
+      display: block;
+      margin: 16px 0 8px;
+      font-size: 14px;
+      color: #d1d5db;
+    }
+
+    input {
+      width: 100%;
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid #4b5563;
+      background: #111827;
+      color: #fff;
+      font-size: 16px;
+    }
+
+    button {
+      width: 100%;
+      margin-top: 16px;
+      padding: 14px;
+      border: 0;
+      border-radius: 10px;
+      background: #22c55e;
+      color: #052e16;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .secondary {
+      background: #374151;
+      color: #fff;
+    }
+
+    .status {
+      margin-top: 16px;
+      padding: 14px;
+      border-radius: 10px;
+      background: #111827;
+      border: 1px solid #374151;
+      white-space: pre-wrap;
+      min-height: 72px;
+      line-height: 1.4;
+    }
+
+    .small {
+      margin-top: 14px;
+      font-size: 13px;
+      color: #9ca3af;
+    }
+  </style>
 </head>
-<body style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; margin:0; font-family:sans-serif;">
-  <button id="btn" onclick="go()" style="font-size:22px; padding:20px 50px; border-radius:12px; cursor:pointer;">
-    🔵 Scan Beacon
-  </button>
-  <p id="msg" style="margin-top:20px; font-size:16px; color:#555; text-align:center; white-space:pre;"></p>
+<body>
+  <div class="card">
+    <h1>NFC Writer Test</h1>
+    <p>
+      Put a URL below, tap <strong>Write URL to Tag</strong>, then hold your Android phone near a writable NFC tag.
+    </p>
+
+    <label for="urlInput">URL</label>
+    <input
+      id="urlInput"
+      type="url"
+      value="https://example.com/test"
+      placeholder="https://example.com/test"
+    />
+
+    <button id="writeBtn">Write URL to Tag</button>
+    <button id="readBtn" class="secondary">Read Tag</button>
+
+    <div id="status" class="status">Ready.</div>
+
+    <div class="small">
+      Best tested on Chrome for Android with NFC enabled.
+    </div>
+  </div>
+
   <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/test-page/sw.js');
+    const urlInput = document.getElementById("urlInput");
+    const writeBtn = document.getElementById("writeBtn");
+    const readBtn = document.getElementById("readBtn");
+    const statusEl = document.getElementById("status");
+
+    function setStatus(message) {
+      statusEl.textContent = message;
     }
-    async function go() {
-      const btn = document.getElementById("btn");
-      const msg = document.getElementById("msg");
-      btn.disabled = true;
-      msg.textContent = "Looking...";
+
+    function validHttpUrl(value) {
       try {
-        const device = await navigator.bluetooth.requestDevice({
-          acceptAllDevices: true
-        });
-        msg.textContent = "✅ Found!\nName: " + device.name + "\nID: " + device.id;
-      } catch(e) {
-        msg.textContent = "Error: " + e.message;
+        const u = new URL(value);
+        return u.protocol === "https:" || u.protocol === "http:";
+      } catch (e) {
+        return false;
       }
-      btn.disabled = false;
     }
+
+    async function writeTag() {
+      const url = urlInput.value.trim();
+
+      if (!("NDEFReader" in window)) {
+        setStatus("Web NFC is not supported on this device/browser.");
+        return;
+      }
+
+      if (!validHttpUrl(url)) {
+        setStatus("Please enter a valid http/https URL.");
+        return;
+      }
+
+      writeBtn.disabled = true;
+      setStatus("Tap NFC tag now...");
+
+      try {
+        const ndef = new NDEFReader();
+
+        await ndef.write({
+          records: [
+            {
+              recordType: "url",
+              data: url
+            }
+          ]
+        });
+
+        setStatus("Success.\nWrote URL:\n" + url);
+      } catch (err) {
+        setStatus("Write failed:\n" + (err.message || String(err)));
+      } finally {
+        writeBtn.disabled = false;
+      }
+    }
+
+    async function readTag() {
+      if (!("NDEFReader" in window)) {
+        setStatus("Web NFC is not supported on this device/browser.");
+        return;
+      }
+
+      readBtn.disabled = true;
+      setStatus("Hold phone near NFC tag to read...");
+
+      try {
+        const ndef = new NDEFReader();
+
+        await ndef.scan();
+
+        ndef.onreadingerror = () => {
+          setStatus("Tag detected, but could not read data.");
+          readBtn.disabled = false;
+        };
+
+        ndef.onreading = (event) => {
+          const { message, serialNumber } = event;
+          let output = "Read success.";
+          if (serialNumber) {
+            output += "\nSerial: " + serialNumber;
+          }
+
+          for (const record of message.records) {
+            output += "\n\nRecord type: " + record.recordType;
+
+            if (record.recordType === "url") {
+              const textDecoder = new TextDecoder(record.encoding || "utf-8");
+              output += "\nURL: " + textDecoder.decode(record.data);
+            } else if (record.recordType === "text") {
+              const textDecoder = new TextDecoder(record.encoding || "utf-8");
+              output += "\nText: " + textDecoder.decode(record.data);
+            } else {
+              output += "\nUnsupported record preview.";
+            }
+          }
+
+          setStatus(output);
+          readBtn.disabled = false;
+        };
+      } catch (err) {
+        setStatus("Read failed:\n" + (err.message || String(err)));
+        readBtn.disabled = false;
+      }
+    }
+
+    writeBtn.addEventListener("click", writeTag);
+    readBtn.addEventListener("click", readTag);
   </script>
 </body>
 </html>
